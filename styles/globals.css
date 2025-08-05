@@ -1,0 +1,35 @@
+/* styles/globals.css (Revisi Total untuk Tema DashCode) */
+@import "tailwindcss";
+
+@theme {
+  /* Palet Warna Utama untuk Tema Gelap */
+  --color-background: hsl(224, 25%, 12%); /* Latar belakang utama konten */
+  --color-foreground: hsl(220, 15%, 85%); /* Teks utama */
+  
+  --color-card: hsl(224, 25%, 16%);       /* Warna kartu, sedikit lebih terang */
+  --color-card-foreground: hsl(220, 15%, 90%);
+
+  --color-sidebar: hsl(224, 25%, 10%);    /* Sidebar, paling gelap */
+
+  --color-primary: hsl(210, 90%, 60%);     /* Biru cerah untuk aksen & highlight */
+  --color-primary-foreground: hsl(0, 0%, 100%);
+
+  --color-secondary: hsl(224, 25%, 25%);
+  --color-secondary-foreground: hsl(220, 15%, 80%);
+  
+  --color-muted: hsl(224, 25%, 25%);
+  --color-muted-foreground: hsl(220, 10%, 60%);
+
+  --color-border: hsl(224, 25%, 20%);
+  --color-input: hsl(224, 25%, 22%);
+  --color-ring: hsl(210, 90%, 60%);
+
+  --radius: 0.5rem;
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
