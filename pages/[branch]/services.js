@@ -169,7 +169,10 @@ export async function getServerSideProps(context) {
         return { props: { ...emptyProps, error: 'Tidak ada cabang yang dikonfigurasi.' } };
     }
 
-    const proxyBaseUrl = `http://localhost:3000/api/branch/${activeBranch.subdomain}`;
+    const isLocal = process.env.NODE_ENV === 'development';
+    const protocol = isLocal ? 'http' : 'https';
+    const host = isLocal ? 'localhost:3000' : context.req.headers.host;
+    const proxyBaseUrl = `${protocol}://${host}/api/branch/${activeBranch.subdomain}`;
 
     try {
         const [servicesRes, customersRes] = await Promise.all([
