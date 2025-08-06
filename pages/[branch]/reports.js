@@ -100,15 +100,15 @@ export async function getServerSideProps(context) {
         return { props: { ...emptyProps, error: 'Tidak ada cabang yang dikonfigurasi.' } };
     }
 
-    const startDate = new Date(new Date().setDate(new Date().getDate() - 29)).toISOString().split('T')[0];
-    const endDate = new Date().toISOString().split('T')[0];
-    const dateParams = `startDate=${startDate}&endDate=${endDate}`;
-    const proxyUrl = `http://localhost:3000/api/branch/${activeBranch.subdomain}`;
+    const isLocal = process.env.NODE_ENV === 'development';
+    const protocol = isLocal ? 'http' : 'https';
+    const host = isLocal ? 'localhost:3000' : context.req.headers.host;
+    const proxyBaseUrl = `${protocol}://${host}/api/branch/${activeBranch.subdomain}`;
 
     try {
         const [summaryRes, transactionsRes] = await Promise.all([
-            fetch(`${proxyUrl}/reports/sales-summary?${dateParams}`),
-            fetch(`${proxyUrl}/transactions?${dateParams}&limit=1000`),
+            fetch(`${proxyBaseUrl}/reports/sales-summary?${dateParams}`),
+            fetch(`${proxyBaseUrl}/transactions?${dateParams}&limit=1000`),
         ]);
 
         if (!summaryRes.ok || !transactionsRes.ok) {
