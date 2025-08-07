@@ -210,9 +210,9 @@ export async function getServerSideProps(context) {
         };
 
         const [servicesResult, customersResult, itemsResult] = await Promise.all([
-            fetchData('services', { limit: 1000 }),
-            fetchData('customers', { limit: 5000 }),
-            fetchData('service_items', { limit: 10000 })
+            fetchData('sync/services', { limit: 1000 }),
+            fetchData('sync/customers', { limit: 5000 }),
+            fetchData('sync/service_items', { limit: 10000 })
         ]);
 
         return {
@@ -237,4 +237,5 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
 
