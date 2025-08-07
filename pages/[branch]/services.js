@@ -77,7 +77,7 @@ const ServiceDetailModal = ({ isOpen, onClose, service }) => {
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm p-4 bg-gray-50 rounded-lg border">
                         <div className="flex items-center gap-3"><User size={16} className="text-gray-500" /><span><strong>Pelanggan:</strong> {service.customer?.name || '-'}</span></div>
                         <div className="flex items-center gap-3"><Tag size={16} className="text-gray-500" /><span><strong>Status:</strong> <span className="font-semibold">{service.status?.toUpperCase().replace('_', ' ')}</span></span></div>
-                        <div className="flex items-center gap-3"><Calendar size={16} className="text-gray-500" /><span><strong>Tanggal:</strong> {formatDate(service.createdAt)}</span></div>
+                        <div className="flex items-center gap-3"><Calendar size={16} className="text-gray-500" /><span><strong>Tanggal:</strong> {formatDate(service.createdat)}</span></div>
                     </div>
                     <div>
                         <h3 className="font-semibold text-md mb-2 flex items-center gap-2"><ShoppingCart size={18} /> Item Servis & Jasa</h3>
@@ -240,3 +240,4 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
