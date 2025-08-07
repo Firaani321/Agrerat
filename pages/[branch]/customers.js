@@ -91,7 +91,13 @@ export async function getServerSideProps(context) {
     const url = `${API_CENTRAL_URL}/api/sync/customers?branch_id=${branchId}&limit=1000`;
 
     try {
-        const response = await fetch(url, { headers: { 'x-api-key': process.env.API_KEY || '' } });
+        const response = await fetch(url, {
+            headers: {
+                'x-api-key': process.env.API_KEY || '',
+                // Header untuk melewati halaman peringatan zrok
+                'skip_zrok_interstitial': 'true'
+            }
+        });
         if (!response.ok) {
             throw new Error(`Gagal memuat data dari server pusat.`);
         }
@@ -116,4 +122,5 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
 
