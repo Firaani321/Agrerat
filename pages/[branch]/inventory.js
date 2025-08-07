@@ -1,6 +1,7 @@
 // pages/[branch]/inventory.js (Refactor Desain DashCode)
 import React from 'react';
 import { AlertTriangle } from 'lucide-react';
+import Link from 'next/link'; // <--- TAMBAHKAN BARIS INI
 
 const SideNavigation = ({ activeBranch, currentPage }) => {
     const navItems = [
@@ -118,3 +119,4 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
