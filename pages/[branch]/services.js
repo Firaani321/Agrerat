@@ -36,31 +36,50 @@ const SideNavigation = ({ activeBranch, currentPage }) => {
 };
 
 // --- Komponen Modal Filter ---
-const ServiceFilterModal = ({ isOpen, onClose, onApply, initialFilters }) => {
+const ServiceFilterPopover = ({ isOpen, onClose, onApply, initialFilters }) => {
     const STATUS_OPTIONS = [
         { value: 'queue', label: 'Antrian' }, { value: 'in_progress', label: 'Dikerjakan' },
         { value: 'completed', label: 'Selesai' }, { value: 'paid', label: 'Dibayar' },
         { value: 'debts', label: 'Utang' }, { value: 'cancelled', label: 'Dibatalkan' },
     ];
     const [selectedStatuses, setSelectedStatuses] = useState(initialFilters.statuses || []);
+    const popoverRef = useRef(null);
+
+    // Efek untuk menutup popover saat klik di luar
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+                onClose();
+            }
+        };
+        if (isOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isOpen, onClose]);
+    
     useEffect(() => { if (isOpen) setSelectedStatuses(initialFilters.statuses || []); }, [isOpen, initialFilters]);
+
     if (!isOpen) return null;
+
     const handleStatusToggle = (statusValue) => setSelectedStatuses(prev => prev.includes(statusValue) ? prev.filter(s => s !== statusValue) : [...prev, statusValue]);
     const handleApply = () => { onApply({ statuses: selectedStatuses }); onClose(); };
     const handleReset = () => { onApply({ statuses: [] }); onClose(); };
+    
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
-                <div className="p-4 border-b flex justify-between items-center"><h2 className="text-xl font-bold">Filter Status</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl">&times;</button></div>
-                <div className="p-6">
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {STATUS_OPTIONS.map(opt => (
-                            <label key={opt.value} className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" checked={selectedStatuses.includes(opt.value)} onChange={() => handleStatusToggle(opt.value)} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>{opt.label}</span></label>
-                        ))}
-                    </div>
+        // Perubahan utama ada di sini: menggunakan 'absolute' positioning
+        <div ref={popoverRef} className="absolute top-full right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border z-50">
+            <div className="p-4 border-b flex justify-between items-center"><h2 className="text-lg font-bold">Filter Status</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600 rounded-full p-1"><X size={20} /></button></div>
+            <div className="p-4">
+                <div className="grid grid-cols-2 gap-3">
+                    {STATUS_OPTIONS.map(opt => (
+                        <label key={opt.value} className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" checked={selectedStatuses.includes(opt.value)} onChange={() => handleStatusToggle(opt.value)} className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>{opt.label}</span></label>
+                    ))}
                 </div>
-                <div className="p-4 bg-gray-50 flex justify-end items-center space-x-3"><button onClick={handleReset} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-semibold">Reset</button><button onClick={handleApply} className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold">Terapkan</button></div>
             </div>
+            <div className="p-3 bg-gray-50 flex justify-end items-center space-x-2"><button onClick={handleReset} className="px-4 py-1.5 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 text-sm font-semibold">Reset</button><button onClick={handleApply} className="px-4 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-bold">Terapkan</button></div>
         </div>
     );
 };
@@ -178,14 +197,42 @@ export default function ServicePage({ initialServices, initialCustomers, initial
         <main className="p-6 bg-gray-50 min-h-screen">
             <h1 className="text-3xl font-bold mb-2">Manajemen Servis</h1>
             <p className="text-lg text-gray-600 mb-6">Cabang: <span className="font-semibold text-blue-600">{branchName}</span></p>
+
             <SideNavigation activeBranch={activeBranch} currentPage="services" />
+            
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
-                <div className="relative flex-grow"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Cari berdasarkan nama pelanggan atau ID servis..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-3 pl-10 border border-gray-300 rounded-lg"/></div>
-                <button onClick={() => setFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100"><Filter size={18} /> Filter Status</button>
+                <div className="relative flex-grow">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input type="text" placeholder="Cari berdasarkan nama pelanggan atau ID servis..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-3 pl-10 border border-gray-300 rounded-lg"/>
+                </div>
+                {/* Penampung tombol filter dibuat 'relative' untuk positioning popover */}
+                <div className="relative">
+                    <button onClick={() => setFilterOpen(prev => !prev)} className="w-full sm:w-auto flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100">
+                        <Filter size={18} /> Filter Status
+                    </button>
+                    <ServiceFilterPopover 
+                        isOpen={isFilterOpen} 
+                        onClose={() => setFilterOpen(false)} 
+                        onApply={setFilters}
+                        initialFilters={filters}
+                    />
+                </div>
             </div>
-            {error ? (<div className="text-center py-12 text-red-600 font-semibold bg-red-50 p-4 rounded-lg">{error}</div>) : (<ServiceTable services={enrichedAndFilteredServices} onViewDetails={(service) => setDetailModalState({ isOpen: true, service })} />)}
-            <ServiceFilterModal isOpen={isFilterModalOpen} onClose={() => setFilterModalOpen(false)} onApply={setFilters} initialFilters={filters} />
-            <ServiceDetailModal isOpen={detailModalState.isOpen} onClose={() => setDetailModalState({ isOpen: false, service: null })} service={detailModalState.service} />
+            
+            {error ? (
+                <div className="text-center py-12 text-red-600 font-semibold bg-red-50 p-4 rounded-lg">{error}</div>
+            ) : (
+                <ServiceTable 
+                    services={enrichedAndFilteredServices} 
+                    onViewDetails={(service) => setDetailModalState({ isOpen: true, service })} 
+                />
+            )}
+            
+            <ServiceDetailModal 
+                isOpen={detailModalState.isOpen} 
+                onClose={() => setDetailModalState({ isOpen: false, service: null })} 
+                service={detailModalState.service} 
+            />
         </main>
     );
 }
@@ -240,5 +287,6 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
 
 
