@@ -1,7 +1,28 @@
 // pages/[branch]/services.js (Refactor Desain DashCode)
 import React, { useState, useMemo } from 'react';
+import Link from 'next/link';
 import { Search, Eye, X } from 'lucide-react';
 
+const SideNavigation = ({ activeBranch, currentPage }) => {
+    const navItems = [
+        { href: 'reports', label: 'Laporan' },
+        { href: 'services', label: 'Servis' },
+        { href: 'inventory', label: 'Inventaris' },
+        { href: 'customers', label: 'Pelanggan' },
+    ];
+
+    return (
+        <div className="mb-8 flex items-center border-b border-gray-200">
+            {navItems.map(item => (
+                <Link key={item.href}
+                    href={`/${activeBranch.name.toLowerCase()}/${item.href}`}
+                    className={`py-3 px-5 text-sm font-semibold border-b-2 ${currentPage === item.href ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                        {item.label}
+                </Link>
+            ))}
+        </div>
+    );
+};
 // --- Helper Functions ---
 const formatCurrency = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(number) || 0);
 const formatDate = (dateString) => {
@@ -102,7 +123,7 @@ const TAB_CONFIG = {
   [TABS.HISTORY]: { label: 'Riwayat Servis', statuses: ['paid', 'debts', 'cancelled'] }
 };
 
-export default function ServicePage({ initialServices, error, branchName }) {
+export default function ServicePage({ initialServices, initialCustomers, initialServiceItems, error, branchName, activeBranch }) {
     const [activeTab, setActiveTab] = useState(TABS.ACTIVE);
     const [searchQuery, setSearchQuery] = useState('');
     const [detailModalState, setDetailModalState] = useState({ isOpen: false, service: null });
@@ -163,42 +184,50 @@ export async function getServerSideProps(context) {
     const { branch: branchName } = context.params;
     const branches = JSON.parse(process.env.NEXT_PUBLIC_BRANCHES || '[]');
     const activeBranch = branches.find(b => b.name.toLowerCase() === branchName.toLowerCase());
-    const emptyProps = { initialServices: [], error: null, branchName: branchName || "Unknown" };
+    
+    const emptyProps = { initialServices: [], initialCustomers: [], initialServiceItems: [] };
 
     if (!activeBranch) {
-        return { props: { ...emptyProps, error: 'Tidak ada cabang yang dikonfigurasi.' } };
+        return { props: { ...emptyProps, error: 'Cabang tidak ditemukan.', branchName } };
     }
 
-    const isLocal = process.env.NODE_ENV === 'development';
-    const protocol = isLocal ? 'http' : 'https';
-    const host = isLocal ? 'localhost:3000' : context.req.headers.host;
-    const proxyBaseUrl = `${protocol}://${host}/api/branch/${activeBranch.subdomain}`;
+    const API_CENTRAL_URL = process.env.NEXT_PUBLIC_API_CENTRAL_URL;
+    const branchId = activeBranch.subdomain;
 
     try {
-        const [servicesRes, customersRes] = await Promise.all([
-            fetch(`${proxyBaseUrl}/services?limit=1000`),
-            fetch(`${proxyBaseUrl}/customers`),
+        const fetchData = async (path, params = {}) => {
+            const query = new URLSearchParams({ branch_id: branchId, ...params }).toString();
+            const url = `${API_CENTRAL_URL}/api/sync/${path}?${query}`;
+            const res = await fetch(url, { headers: { 'x-api-key': process.env.API_KEY || '' } });
+            if (!res.ok) throw new Error(`Failed to fetch ${path}`);
+            return res.json();
+        };
+
+        const [servicesResult, customersResult, itemsResult] = await Promise.all([
+            fetchData('services', { limit: 1000 }),
+            fetchData('customers', { limit: 5000 }),
+            fetchData('service_items', { limit: 10000 })
         ]);
-
-        if (!servicesRes.ok || !customersRes.ok) {
-            throw new Error('Gagal memuat data dari cabang');
-        }
-
-        const [servicesResult, customersResult] = await Promise.all([servicesRes.json(), customersRes.json()]);
-
-        const servicesWithCustomer = servicesResult.data.map(service => ({
-            ...service,
-            customer: customersResult.data.find(c => c.id === service.customer_id)
-        }))
 
         return {
             props: {
-                initialServices: servicesWithCustomer,
+                initialServices: servicesResult.data || [],
+                initialCustomers: customersResult.data || [],
+                initialServiceItems: itemsResult.data || [],
                 branchName: activeBranch.name,
+                activeBranch,
                 error: null,
             },
         };
     } catch (err) {
-        return { props: { ...emptyProps, branchName: activeBranch.name, error: `Gagal menghubungi cabang ${activeBranch.name}.` } };
+        console.error("Server-side fetch error for ServicesPage:", err);
+        return { 
+            props: { 
+                ...emptyProps, 
+                error: `Gagal menghubungi server pusat.`, 
+                branchName: activeBranch.name, 
+                activeBranch 
+            } 
+        };
     }
 }
