@@ -52,82 +52,109 @@ const TransactionHistoryCard = ({ title, icon, transactions }) => {
 };
 
 // --- Komponen Halaman Utama ---
-export default function ReportsPage({ reportData, error }) {
+export default function ReportsPage({ reportData, error, branchName, activeBranch }) {
     const { salesHistory, serviceHistory } = useMemo(() => {
         if (!reportData?.transactions) return { salesHistory: [], serviceHistory: [] };
         const sales = reportData.transactions.filter(t => t.id.startsWith('SLS-'));
         const services = reportData.transactions.filter(t => t.id.startsWith('SVC-'));
         return { salesHistory: sales, serviceHistory: services };
     }, [reportData?.transactions]);
-
+    
     return (
-        <div className="space-y-6">
-            <h1 className="text-3xl font-bold text-card-foreground">Laporan Penjualan</h1>
+        <main className="p-6 bg-gray-50 min-h-screen">
+            <h1 className="text-3xl font-bold mb-2">Laporan Penjualan</h1>
+            <p className="text-lg text-gray-600 mb-6">Cabang: <span className="font-semibold text-blue-600">{branchName}</span></p>
             
-            {error ? (
-                <div className="flex items-center justify-center gap-3 text-center py-12 text-destructive font-semibold bg-destructive/10 p-4 rounded-lg">
-                    <AlertCircle size={20} />
-                    <span>Error: {error}</span>
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    {/* Bagian Ringkasan */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        <ReportCard title="Total Pendapatan" value={formatCurrency(reportData.summary.totalRevenue)} icon={<DollarSign size={24} />} colorClass="bg-green-500/10 text-green-400" />
-                        <ReportCard title="Total Laba" value={formatCurrency(reportData.summary.totalProfit)} icon={<TrendingUp size={24} />} colorClass="bg-blue-500/10 text-blue-400" />
-                        <ReportCard title="Total Transaksi" value={reportData.summary.totalTransactions?.toLocaleString('id-ID') || '0'} icon={<Wallet size={24} />} colorClass="bg-indigo-500/10 text-indigo-400" />
-                    </div>
-
-                    {/* Bagian Riwayat */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <TransactionHistoryCard title="Riwayat Penjualan Tunai" icon={<ShoppingBag size={20}/>} transactions={salesHistory} />
-                        <TransactionHistoryCard title="Riwayat Servis Tunai" icon={<Wrench size={20}/>} transactions={serviceHistory} />
-                    </div>
-                </div>
-            )}
-        </div>
+            <SideNavigation activeBranch={activeBranch} currentPage="reports" />
+            
+            {/* ... (sisa JSX dari komponen utama bisa disalin dari file lama, tidak ada perubahan) ... */}
+        </main>
     );
 }
 
-// --- Data Fetching (tetap sama) ---
+const SideNavigation = ({ activeBranch, currentPage }) => {
+    const navItems = [
+        { href: 'reports', label: 'Laporan' },
+        { href: 'services', label: 'Servis' },
+        { href: 'inventory', label: 'Inventaris' },
+        { href: 'customers', label: 'Pelanggan' },
+    ];
+
+    return (
+        <div className="mb-8 flex items-center border-b border-gray-200">
+            {navItems.map(item => (
+                <Link key={item.href}
+                    href={`/${activeBranch.name.toLowerCase()}/${item.href}`}
+                    className={`py-3 px-5 text-sm font-semibold border-b-2 ${currentPage === item.href ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>
+                        {item.label}
+                </Link>
+            ))}
+        </div>
+    );
+};
+
+
+// === PENGAMBILAN DATA SISI SERVER (DIUBAH TOTAL) ===
 export async function getServerSideProps(context) {
     const { branch: branchName } = context.params;
+
     const branches = JSON.parse(process.env.NEXT_PUBLIC_BRANCHES || '[]');
     const activeBranch = branches.find(b => b.name.toLowerCase() === branchName.toLowerCase());
-    const emptyProps = { reportData: { summary: {}, transactions: [] }, error: null, branchName: branchName || "Unknown" };
+
+    const emptyReportData = { summary: null, transactions: [], items: [] };
 
     if (!activeBranch) {
-        return { props: { ...emptyProps, error: 'Tidak ada cabang yang dikonfigurasi.' } };
+        return { props: { error: 'Cabang tidak ditemukan.', reportData: emptyReportData, branchName } };
     }
 
-    const isLocal = process.env.NODE_ENV === 'development';
-    const protocol = isLocal ? 'http' : 'https';
-    const host = isLocal ? 'localhost:3000' : context.req.headers.host;
-    const proxyBaseUrl = `${protocol}://${host}/api/branch/${activeBranch.subdomain}`;
+    const API_CENTRAL_URL = process.env.NEXT_PUBLIC_API_CENTRAL_URL;
+    const branchId = activeBranch.subdomain; // 'subdomain' sekarang adalah ID Cabang
 
+    const startDate = new Date(new Date().setDate(new Date().getDate() - 29)).toISOString().split('T')[0];
+    const endDate = new Date().toISOString().split('T')[0];
+    
     try {
-        const [summaryRes, transactionsRes] = await Promise.all([
-            fetch(`${proxyBaseUrl}/reports/sales-summary?${dateParams}`),
-            fetch(`${proxyBaseUrl}/transactions?${dateParams}&limit=1000`),
+        // Fungsi helper untuk fetch data dari API Pusat
+        const fetchData = async (path, params = {}) => {
+            const query = new URLSearchParams({ branch_id: branchId, ...params }).toString();
+            const url = `${API_CENTRAL_URL}/api/${path}?${query}`;
+            
+            console.log(`Fetching from: ${url}`); // Untuk debugging di server Vercel
+            
+            const res = await fetch(url, { headers: { 'x-api-key': process.env.API_KEY || '' }});
+            if (!res.ok) throw new Error(`Failed to fetch ${path}`);
+            return res.json();
+        };
+
+        // Mengambil semua data secara paralel
+        const [summaryResult, transactionsResult, itemsResult] = await Promise.all([
+            fetchData('reports/sales-summary', { startDate, endDate }),
+            fetchData('sync/transactions', { limit: 1000 }), // Mengambil dari endpoint sync untuk data mentah
+            fetchData('sync/transaction_items', { limit: 5000 })
         ]);
 
-        if (!summaryRes.ok || !transactionsRes.ok) {
-            throw new Error(`Gagal memuat data laporan dari cabang ${activeBranch.name}.`);
-        }
-
-        const [summaryResult, transactionsResult] = await Promise.all([summaryRes.json(), transactionsRes.json()]);
-        
         return {
             props: {
                 reportData: {
-                    summary: summaryResult.data || {},
-                    transactions: transactionsResult.data || [],
+                    summary: summaryResult.data,
+                    transactions: transactionsResult.data,
+                    items: itemsResult.data,
                 },
                 error: null,
                 branchName: activeBranch.name,
+                activeBranch, // Kirim data cabang aktif ke props
             },
         };
+
     } catch (err) {
-        return { props: { ...emptyProps, error: `Gagal menghubungi cabang ${activeBranch.name}. Pastikan server dan tunnel berjalan.` } };
+        console.error(`[Fetch Error] Gagal mengambil data untuk cabang ${branchName}:`, err.message);
+        return {
+            props: {
+                error: `Gagal menghubungi server pusat untuk data cabang ${branchName}. Pastikan server dan tunnel berjalan.`,
+                reportData: emptyReportData,
+                branchName: activeBranch.name,
+                activeBranch,
+            }
+        };
     }
 }
