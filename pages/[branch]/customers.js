@@ -1,5 +1,6 @@
 // pages/[branch]/customers.js (Refactor Desain DashCode)
 import React from 'react';
+import Link from 'next/link'; // <--- TAMBAHKAN BARIS INI
 
 // Komponen Navigasi Samping (bisa dibuat file terpisah nanti)
 const SideNavigation = ({ activeBranch, currentPage }) => {
@@ -115,3 +116,4 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
