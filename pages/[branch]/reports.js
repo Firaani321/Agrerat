@@ -122,7 +122,13 @@ export async function getServerSideProps(context) {
             
             console.log(`Fetching from: ${url}`); // Untuk debugging di server Vercel
             
-            const res = await fetch(url, { headers: { 'x-api-key': process.env.API_KEY || '' }});
+        const response = await fetch(url, {
+            headers: {
+                'x-api-key': process.env.API_KEY || '',
+                // Header untuk melewati halaman peringatan zrok
+                'skip_zrok_interstitial': 'true'
+            }
+        });
             if (!res.ok) throw new Error(`Failed to fetch ${path}`);
             return res.json();
         };
@@ -159,4 +165,5 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
 
