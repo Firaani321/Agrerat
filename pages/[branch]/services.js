@@ -106,7 +106,7 @@ const ServiceTableRow = React.memo(({ service, onViewDetails }) => {
     const style = STATUS_STYLES[service.status] || STATUS_STYLES.queue;
     return (
         <tr className="bg-white border-b hover:bg-gray-50">
-            <td className="px-4 py-3 text-sm text-gray-700">{formatDate(service.createdAt)}</td>
+            <td className="px-4 py-3 text-sm text-gray-700">{formatDate(service.createdat)}</td>
             <td className="px-4 py-3 font-medium text-gray-900">{service.customer?.name || 'N/A'}</td>
             <td className="px-4 py-3 font-mono text-sm">{service.id_service}</td>
             <td className="px-4 py-3 text-right font-mono font-semibold">{formatCurrency(totalHarga)}</td>
@@ -171,7 +171,7 @@ export default function ServicePage({ initialServices, initialCustomers, initial
             const lowercasedQuery = searchQuery.toLowerCase();
             enriched = enriched.filter(s => s.customer?.name?.toLowerCase().includes(lowercasedQuery) || s.id_service?.toLowerCase().includes(lowercasedQuery));
         }
-        return enriched.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        return enriched.sort((a, b) => new Date(b.createdat) - new Date(a.createdat));
     }, [error, initialServices, initialCustomers, initialServiceItems, searchQuery, filters]);
 
     return (
@@ -240,4 +240,5 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
 
