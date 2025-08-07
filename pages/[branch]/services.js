@@ -1,20 +1,20 @@
-// File: pages/[branch]/services.js (FINAL - Dengan Perbaikan Error Kompilasi)
-
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
-// Perbaikan #1: Menambahkan AlertCircle yang hilang
-import { Search, Eye, X, Info, ShoppingCart, User, Tag, Calendar, Edit, DollarSign, AlertCircle } from 'lucide-react';
+import { Search, Eye, X, User, Tag, Calendar, DollarSign, ShoppingCart, Filter, Edit } from 'lucide-react';
 
-// --- Komponen & Helpers ---
+// =======================================================
+// ===           KOMPONEN & HELPER FUNCTIONS           ===
+// =======================================================
+
 const formatCurrency = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(number) || 0);
 const formatDate = (dateString) => {
     if (!dateString) return '-';
     try {
-        return new Date(dateString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+        // Format tanggal yang lebih ringkas dan jelas
+        return new Date(dateString).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
     } catch (e) { return dateString; }
 };
 
-// --- Navigasi Samping (Konsisten) ---
 const SideNavigation = ({ activeBranch, currentPage }) => {
     const navItems = [
         { href: 'reports', label: 'Laporan' },
@@ -35,106 +35,123 @@ const SideNavigation = ({ activeBranch, currentPage }) => {
     );
 };
 
-// Perbaikan #2: Mendefinisikan kembali komponen ServiceTable
-const ServiceTable = ({ services, onViewDetails }) => {
+// --- Komponen Modal Filter ---
+const ServiceFilterModal = ({ isOpen, onClose, onApply, initialFilters }) => {
+    const STATUS_OPTIONS = [
+        { value: 'queue', label: 'Antrian' }, { value: 'in_progress', label: 'Dikerjakan' },
+        { value: 'completed', label: 'Selesai' }, { value: 'paid', label: 'Dibayar' },
+        { value: 'debts', label: 'Utang' }, { value: 'cancelled', label: 'Dibatalkan' },
+    ];
+    const [selectedStatuses, setSelectedStatuses] = useState(initialFilters.statuses || []);
+    useEffect(() => { if (isOpen) setSelectedStatuses(initialFilters.statuses || []); }, [isOpen, initialFilters]);
+    if (!isOpen) return null;
+    const handleStatusToggle = (statusValue) => setSelectedStatuses(prev => prev.includes(statusValue) ? prev.filter(s => s !== statusValue) : [...prev, statusValue]);
+    const handleApply = () => { onApply({ statuses: selectedStatuses }); onClose(); };
+    const handleReset = () => { onApply({ statuses: [] }); onClose(); };
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-lg">
+                <div className="p-4 border-b flex justify-between items-center"><h2 className="text-xl font-bold">Filter Status</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-3xl">&times;</button></div>
+                <div className="p-6">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {STATUS_OPTIONS.map(opt => (
+                            <label key={opt.value} className="flex items-center space-x-3 cursor-pointer"><input type="checkbox" checked={selectedStatuses.includes(opt.value)} onChange={() => handleStatusToggle(opt.value)} className="h-5 w-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" /><span>{opt.label}</span></label>
+                        ))}
+                    </div>
+                </div>
+                <div className="p-4 bg-gray-50 flex justify-end items-center space-x-3"><button onClick={handleReset} className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 font-semibold">Reset</button><button onClick={handleApply} className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-bold">Terapkan</button></div>
+            </div>
+        </div>
+    );
+};
+
+// --- Komponen Modal Detail ---
+const ServiceDetailModal = ({ isOpen, onClose, service }) => {
+    if (!isOpen || !service) return null;
+    const totalBiaya = service.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || service.total_cost || 0;
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+                <div className="p-4 border-b flex justify-between items-center"><h2 className="text-xl font-bold text-gray-800">Detail Servis: {service.id_service}</h2><button onClick={onClose} className="text-gray-400 hover:text-gray-600 rounded-full p-1"><X size={24} /></button></div>
+                <div className="p-6 overflow-y-auto space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm p-4 bg-gray-50 rounded-lg border">
+                        <div className="flex items-center gap-3"><User size={16} className="text-gray-500" /><span><strong>Pelanggan:</strong> {service.customer?.name || '-'}</span></div>
+                        <div className="flex items-center gap-3"><Tag size={16} className="text-gray-500" /><span><strong>Status:</strong> <span className="font-semibold">{service.status?.toUpperCase().replace('_', ' ')}</span></span></div>
+                        <div className="flex items-center gap-3"><Calendar size={16} className="text-gray-500" /><span><strong>Tanggal:</strong> {formatDate(service.createdAt)}</span></div>
+                    </div>
+                    <div>
+                        <h3 className="font-semibold text-md mb-2 flex items-center gap-2"><ShoppingCart size={18} /> Item Servis & Jasa</h3>
+                        <ul className="border rounded-md divide-y">{service.items && service.items.length > 0 ? service.items.map(item => (<li key={item.local_id} className="p-3 flex justify-between items-center"><div><p className="font-medium">{item.product_name}</p><p className="text-xs text-gray-500">{item.quantity} x {formatCurrency(item.price)}</p></div><p className="font-semibold">{formatCurrency(item.quantity * item.price)}</p></li>)) : <li className="p-3 text-center text-gray-500 text-sm">Tidak ada item.</li>}</ul>
+                    </div>
+                    {service.notes && (<div><h3 className="font-semibold text-md mb-2 flex items-center gap-2"><Edit size={18} /> Catatan</h3><p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md border">{service.notes}</p></div>)}
+                    <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg space-y-2"><div className="flex justify-between text-xl font-bold"><span>Total Tagihan</span><span>{formatCurrency(totalBiaya)}</span></div></div>
+                </div>
+                <div className="p-4 bg-gray-50 border-t flex justify-end"><button onClick={onClose} className="px-5 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-semibold">Tutup</button></div>
+            </div>
+        </div>
+    );
+};
+
+// --- Komponen Baris Tabel (Dioptimalkan) ---
+const ServiceTableRow = React.memo(({ service, onViewDetails }) => {
     const STATUS_STYLES = {
-        queue: 'border-l-gray-400', in_progress: 'border-l-yellow-400',
-        completed: 'border-l-green-400', paid: 'border-l-blue-400',
-        cancelled: 'border-l-red-400', debts: 'border-l-orange-400',
+        queue: { text: 'text-gray-600', bg: 'bg-gray-100' },
+        in_progress: { text: 'text-yellow-800', bg: 'bg-yellow-100' },
+        completed: { text: 'text-green-800', bg: 'bg-green-100' },
+        paid: { text: 'text-blue-800', bg: 'bg-blue-100' },
+        cancelled: { text: 'text-red-800', bg: 'bg-red-100' },
+        debts: { text: 'text-orange-800', bg: 'bg-orange-100' },
     };
-    if (!services || services.length === 0) {
-        return <div className="text-center py-12 text-gray-500">Tidak ada data servis untuk ditampilkan.</div>;
-    }
+    const totalHarga = service.items?.reduce((acc, item) => acc + item.price * item.quantity, 0) || service.total_cost || 0;
+    const style = STATUS_STYLES[service.status] || STATUS_STYLES.queue;
+    return (
+        <tr className="bg-white border-b hover:bg-gray-50">
+            <td className="px-4 py-3 text-sm text-gray-700">{formatDate(service.createdAt)}</td>
+            <td className="px-4 py-3 font-medium text-gray-900">{service.customer?.name || 'N/A'}</td>
+            <td className="px-4 py-3 font-mono text-sm">{service.id_service}</td>
+            <td className="px-4 py-3 text-right font-mono font-semibold">{formatCurrency(totalHarga)}</td>
+            <td className="px-4 py-3">
+                <span className={`px-3 py-1 text-xs font-bold rounded-full ${style.bg} ${style.text}`}>
+                    {service.status.replace('_', ' ').toUpperCase()}
+                </span>
+            </td>
+            <td className="px-4 py-3 text-center">
+                <button onClick={() => onViewDetails(service)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="Lihat Detail Pekerjaan"><Eye size={18} /></button>
+            </td>
+        </tr>
+    );
+});
+ServiceTableRow.displayName = 'ServiceTableRow'; // Untuk debugging
+
+// --- Komponen Tabel Utama ---
+const ServiceTable = ({ services, onViewDetails }) => {
+    if (!services || services.length === 0) return <div className="text-center py-16 text-gray-500"><p className="font-semibold">Tidak Ada Data</p><p className="text-sm">Tidak ada servis yang cocok dengan filter Anda.</p></div>;
     return (
         <div className="overflow-x-auto bg-white rounded-lg shadow border">
             <table className="min-w-full text-sm text-left text-gray-500">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50">
                     <tr>
-                        <th scope="col" className="px-4 py-3">Tanggal</th>
-                        <th scope="col" className="px-4 py-3">ID Servis</th>
-                        <th scope="col" className="px-4 py-3">Nama Pelanggan</th>
-                        <th scope="col" className="px-4 py-3 text-right">Total Biaya</th>
-                        <th scope="col" className="px-4 py-3">Status</th>
-                        <th scope="col" className="px-4 py-3 text-center">Aksi</th>
+                        <th scope="col" className="px-4 py-3">Tanggal</th><th scope="col" className="px-4 py-3">Nama Pelanggan</th>
+                        <th scope="col" className="px-4 py-3">ID Servis</th><th scope="col" className="px-4 py-3 text-right">Total Biaya</th>
+                        <th scope="col" className="px-4 py-3">Status</th><th scope="col" className="px-4 py-3 text-center">Aksi</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {services.map(service => {
-                        const totalHarga = service.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || service.total_cost || 0;
-                        const rowStyle = STATUS_STYLES[service.status] || 'border-l-gray-300';
-                        return (
-                            <tr key={service.id_service || service.id} className={`bg-white border-b hover:bg-gray-50 border-l-8 ${rowStyle}`}>
-                                <td className="px-4 py-3">{formatDate(service.createdAt)}</td>
-                                <td className="px-4 py-3 font-semibold text-gray-800">{service.id_service}</td>
-                                <td className="px-4 py-3 font-medium">{service.customer?.name || 'N/A'}</td>
-                                <td className="px-4 py-3 text-right font-mono">{formatCurrency(totalHarga)}</td>
-                                <td className="px-4 py-3 font-semibold">{service.status.replace('_',' ').toUpperCase()}</td>
-                                <td className="px-4 py-3 text-center">
-                                    <button onClick={() => onViewDetails(service)} className="p-2 text-gray-500 hover:bg-gray-200 rounded-full" title="Lihat Detail"><Eye size={18} /></button>
-                                </td>
-                            </tr>
-                        );
-                    })}
+                    {services.map(service => <ServiceTableRow key={service.id_service} service={service} onViewDetails={onViewDetails} />)}
                 </tbody>
             </table>
         </div>
     );
 };
 
-
-// --- Modal Detail Servis ---
-const ServiceDetailModal = ({ isOpen, onClose, service }) => {
-    if (!isOpen || !service) return null;
-    const totalBiaya = service.items?.reduce((acc, item) => acc + (item.price * item.quantity), 0) || service.total_cost || 0;
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity duration-300">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
-                <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="text-xl font-bold text-gray-800">Detail Servis: {service.id_service}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 rounded-full p-1"><X size={24} /></button>
-                </div>
-                <div className="p-6 overflow-y-auto space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <div className="flex items-center gap-3"><User size={16} className="text-gray-500" /><span><strong>Pelanggan:</strong> {service.customer?.name || '-'}</span></div>
-                        <div className="flex items-center gap-3"><Tag size={16} className="text-gray-500" /><span><strong>Status:</strong> <span className="font-semibold">{service.status?.toUpperCase()}</span></span></div>
-                        <div className="flex items-center gap-3"><Calendar size={16} className="text-gray-500" /><span><strong>Tanggal Masuk:</strong> {formatDate(service.createdAt)}</span></div>
-                        <div className="flex items-center gap-3"><DollarSign size={16} className="text-gray-500" /><span><strong>Total Biaya:</strong> <span className="font-bold text-blue-600">{formatCurrency(totalBiaya)}</span></span></div>
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-md mb-2 flex items-center gap-2"><ShoppingCart size={18} /> Item Servis</h3>
-                        <ul className="border rounded-md divide-y">
-                            {service.items && service.items.length > 0 ? service.items.map(item => (
-                                <li key={item.local_id || item.id} className="p-3 flex justify-between items-center">
-                                    <div><p className="font-medium">{item.product_name}</p><p className="text-xs text-gray-500">{item.quantity} x {formatCurrency(item.price)}</p></div>
-                                    <p className="font-semibold">{formatCurrency(item.quantity * item.price)}</p>
-                                </li>
-                            )) : <li className="p-3 text-center text-gray-500 text-sm">Tidak ada item.</li>}
-                        </ul>
-                    </div>
-                    {service.notes && (
-                        <div>
-                            <h3 className="font-semibold text-md mb-2 flex items-center gap-2"><Edit size={18} /> Catatan</h3>
-                            <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-md border">{service.notes}</p>
-                        </div>
-                    )}
-                </div>
-                <div className="p-4 bg-gray-50 border-t flex justify-end">
-                    <button onClick={onClose} className="px-5 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 text-sm font-semibold">Tutup</button>
-                </div>
-            </div>
-        </div>
-    );
-};
-
-
-// --- Komponen Halaman Utama ---
+// =======================================================
+// ===           HALAMAN UTAMA SERVICE PAGE            ===
+// =======================================================
 export default function ServicePage({ initialServices, initialCustomers, initialServiceItems, error, branchName, activeBranch }) {
-    const [activeTab, setActiveTab] = useState('active');
     const [searchQuery, setSearchQuery] = useState('');
+    const [filters, setFilters] = useState({ statuses: [] });
+    const [isFilterModalOpen, setFilterModalOpen] = useState(false);
     const [detailModalState, setDetailModalState] = useState({ isOpen: false, service: null });
-
-    const handleViewDetails = (service) => setDetailModalState({ isOpen: true, service });
-    const handleCloseModal = () => setDetailModalState({ isOpen: false, service: null });
 
     const enrichedAndFilteredServices = useMemo(() => {
         if (error || !initialServices) return [];
@@ -144,61 +161,44 @@ export default function ServicePage({ initialServices, initialCustomers, initial
             if (!itemsMap.has(item.service_id)) itemsMap.set(item.service_id, []);
             itemsMap.get(item.service_id).push(item);
         });
-        const enriched = initialServices.map(service => ({
+        let enriched = initialServices.map(service => ({
             ...service,
             customer: customerMap.get(service.customer_id),
             items: itemsMap.get(service.local_id) || [],
         }));
-        const statusesForTab = activeTab === 'active' ? ['queue', 'in_progress', 'completed'] : ['paid', 'debts', 'cancelled'];
-        let servicesForTab = enriched.filter(s => s && s.status && statusesForTab.includes(s.status));
+        if (filters.statuses.length > 0) enriched = enriched.filter(s => filters.statuses.includes(s.status));
         if (searchQuery.trim() !== '') {
             const lowercasedQuery = searchQuery.toLowerCase();
-            servicesForTab = servicesForTab.filter(s =>
-                s.customer?.name?.toLowerCase().includes(lowercasedQuery) ||
-                s.id_service?.toLowerCase().includes(lowercasedQuery)
-            );
+            enriched = enriched.filter(s => s.customer?.name?.toLowerCase().includes(lowercasedQuery) || s.id_service?.toLowerCase().includes(lowercasedQuery));
         }
-        return servicesForTab.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-    }, [error, initialServices, initialCustomers, initialServiceItems, activeTab, searchQuery]);
+        return enriched.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }, [error, initialServices, initialCustomers, initialServiceItems, searchQuery, filters]);
 
     return (
         <main className="p-6 bg-gray-50 min-h-screen">
             <h1 className="text-3xl font-bold mb-2">Manajemen Servis</h1>
             <p className="text-lg text-gray-600 mb-6">Cabang: <span className="font-semibold text-blue-600">{branchName}</span></p>
             <SideNavigation activeBranch={activeBranch} currentPage="services" />
-            <div className="mb-6 border-b border-gray-300">
-                <nav className="-mb-px flex space-x-6">
-                    <button onClick={() => setActiveTab('active')} className={`py-3 px-4 border-b-2 text-sm font-semibold ${activeTab === 'active' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Pekerjaan Aktif</button>
-                    <button onClick={() => setActiveTab('history')} className={`py-3 px-4 border-b-2 text-sm font-semibold ${activeTab === 'history' ? 'border-blue-500 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>Riwayat Servis</button>
-                </nav>
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="relative flex-grow"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Cari berdasarkan nama pelanggan atau ID servis..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-3 pl-10 border border-gray-300 rounded-lg"/></div>
+                <button onClick={() => setFilterModalOpen(true)} className="flex items-center justify-center gap-2 px-4 py-3 bg-white border border-gray-300 rounded-lg font-semibold text-gray-700 hover:bg-gray-100"><Filter size={18} /> Filter Status</button>
             </div>
-            <div className="mb-6 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input type="text" placeholder="Cari berdasarkan nama pelanggan atau ID servis..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-3 pl-10 border border-gray-300 rounded-lg"/>
-            </div>
-            {error ? (
-                <div className="text-center py-12 text-red-600 font-semibold bg-red-50 p-4 rounded-lg flex items-center justify-center gap-2">
-                    <AlertCircle size={20} /> {error}
-                </div>
-            ) : (
-                <ServiceTable services={enrichedAndFilteredServices} onViewDetails={handleViewDetails} />
-            )}
-            <ServiceDetailModal isOpen={detailModalState.isOpen} onClose={handleCloseModal} service={detailModalState.service} />
+            {error ? (<div className="text-center py-12 text-red-600 font-semibold bg-red-50 p-4 rounded-lg">{error}</div>) : (<ServiceTable services={enrichedAndFilteredServices} onViewDetails={(service) => setDetailModalState({ isOpen: true, service })} />)}
+            <ServiceFilterModal isOpen={isFilterModalOpen} onClose={() => setFilterModalOpen(false)} onApply={setFilters} initialFilters={filters} />
+            <ServiceDetailModal isOpen={detailModalState.isOpen} onClose={() => setDetailModalState({ isOpen: false, service: null })} service={detailModalState.service} />
         </main>
     );
 }
 
-// --- Pengambilan Data Sisi Server ---
+// =======================================================
+// ===           PENGAMBILAN DATA SISI SERVER          ===
+// =======================================================
 export async function getServerSideProps(context) {
     const { branch: branchName } = context.params;
     const branches = JSON.parse(process.env.NEXT_PUBLIC_BRANCHES || '[]');
     const activeBranch = branches.find(b => b.name.toLowerCase() === branchName.toLowerCase());
-    
     const emptyProps = { initialServices: [], initialCustomers: [], initialServiceItems: [] };
-
-    if (!activeBranch) {
-        return { props: { ...emptyProps, error: 'Cabang tidak ditemukan.', branchName, activeBranch: {} } };
-    }
+    if (!activeBranch) return { props: { ...emptyProps, error: 'Cabang tidak ditemukan.', branchName, activeBranch: {} } };
 
     const API_CENTRAL_URL = process.env.NEXT_PUBLIC_API_CENTRAL_URL;
     const branchId = activeBranch.subdomain;
@@ -207,20 +207,13 @@ export async function getServerSideProps(context) {
         const fetchData = async (path, params = {}) => {
             const query = new URLSearchParams({ branch_id: branchId, ...params }).toString();
             const url = `${API_CENTRAL_URL}/api/${path}?${query}`;
-            const response = await fetch(url, {
-                headers: {
-                    'x-api-key': process.env.API_KEY || '',
-                    'skip_zrok_interstitial': 'true'
-                }
-            });
-            if (!response.ok) {
-                throw new Error(`Gagal fetch dari path '${path}' dengan status: ${response.status}`);
-            }
+            const response = await fetch(url, { headers: { 'x-api-key': process.env.API_KEY || '', 'skip_zrok_interstitial': 'true' } });
+            if (!response.ok) throw new Error(`Gagal fetch dari path '${path}' dengan status: ${response.status}`);
             return response.json();
         };
 
         const [servicesResult, customersResult, itemsResult] = await Promise.all([
-            fetchData('sync/services', { limit: 1000 }),
+            fetchData('sync/services', { limit: 2000 }),
             fetchData('sync/customers', { limit: 5000 }),
             fetchData('sync/service_items', { limit: 10000 })
         ]);
@@ -240,7 +233,7 @@ export async function getServerSideProps(context) {
         return { 
             props: { 
                 ...emptyProps, 
-                error: `Gagal menghubungi server pusat. Pastikan server dan tunnel berjalan. (${err.message})`, 
+                error: `Gagal menghubungi server pusat. Pastikan server dan tunnel berjalan.`, 
                 branchName: activeBranch.name, 
                 activeBranch 
             } 
