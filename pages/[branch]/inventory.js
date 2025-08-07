@@ -51,7 +51,7 @@ const ProductTable = ({ products }) => {
                                 <td className="px-6 py-4 font-medium">{product.name}</td>
                                 <td className="px-6 py-4">{product.sku || '-'}</td>
                                 <td className="px-6 py-4 text-right font-mono">{formatCurrency(product.price)}</td>
-                                <td className={`px-6 py-4 text-right font-bold ${isLowStock ? 'text-red-600' : 'text-gray-800'}`}>{product.stock} / {product.minStock}</td>
+                                <td className={`px-6 py-4 text-right font-bold ${isLowStock ? 'text-red-600' : 'text-gray-800'}`}>{product.stock} / {product.minstock}</td>
                             </tr>
                         )
                     })}
@@ -125,5 +125,6 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
 
 
