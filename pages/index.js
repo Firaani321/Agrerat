@@ -1,58 +1,51 @@
-// pages/index.js (Versi Modern & Berwarna)
+// File: pages/index.js (Versi BARU)
+
 import React from 'react';
 import Link from 'next/link';
-import { Building, ArrowRight } from 'lucide-react';
+import { Building } from 'lucide-react';
 
 function BranchCard({ branch }) {
-  return (
-    <Link
-      href={`/${branch.name.toLowerCase()}/services`}
-      className="group bg-card text-card-foreground p-6 rounded-xl shadow-sm border border-border transition-all hover:shadow-lg hover:-translate-y-1 hover:border-primary"
-    >
-      <div className="flex justify-between items-start">
-        <div className="p-3 bg-primary/10 rounded-lg">
-          <Building className="h-6 w-6 text-primary" />
-        </div>
-        <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
-      </div>
-      <div className="mt-4">
-        <h3 className="font-bold text-lg text-foreground">{branch.name}</h3>
-        <p className="text-sm text-muted-foreground mt-1">Lihat data operasional</p>
-      </div>
-    </Link>
-  );
+    // URL sekarang akan menjadi /nama-cabang/reports untuk langsung ke halaman laporan
+    return (
+        <Link 
+            href={`/${branch.name.toLowerCase()}/reports`}
+            className="block border border-slate-200 bg-white p-8 rounded-xl shadow-sm transition-all hover:shadow-lg hover:-translate-y-1 hover:border-blue-500 group"
+        >
+            <div className="text-center">
+                <Building size={40} className="mx-auto text-slate-400 group-hover:text-blue-500 transition-colors"/>
+                <h3 className="font-bold text-2xl text-slate-800 mt-4">{branch.name}</h3>
+                <p className="text-sm text-slate-500 mt-2">Lihat Laporan & Detail</p>
+            </div>
+        </Link>
+    );
 }
 
 export default function HomePage({ branches }) {
-  return (
-    <div 
-      className="min-h-screen w-full flex flex-col items-center justify-center p-8"
-      style={{ background: 'radial-gradient(circle, hsl(220 20% 92%), hsl(220 20% 97%))' }}
-    >
-      <div className="text-center mb-12">
-        <h1 className="text-5xl font-extrabold tracking-tight text-foreground">
-          Dashboard Perusahaan BY Ai Labs
-        </h1>
-        <p className="text-xl text-muted-foreground mt-4 max-w-2xl">
-          Selamat datang. Pilih salah satu cabang untuk memulai mengelola data.
-        </p>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
-        {branches.length > 0 ? (
-          branches.map(branch => <BranchCard key={branch.name} branch={branch} />)
-        ) : (
-          <div className="col-span-full bg-card p-8 rounded-lg text-center text-muted-foreground shadow-sm border">
-            Belum ada cabang yang dikonfigurasi pada file `.env.local` Anda.
-          </div>
-        )}
-      </div>
-    </div>
-  );
+    return (
+        <main className="p-6 bg-gray-50 min-h-screen">
+            <div className="text-center max-w-2xl mx-auto">
+                <h1 className="text-4xl font-bold text-slate-900 mb-2">Dashboard Laporan Terpusat</h1>
+                <p className="text-lg text-slate-600">Silakan pilih cabang untuk melihat detail laporan dan data operasional.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mt-12 max-w-7xl mx-auto">
+                {branches.length > 0 ? (
+                    branches.map(branch => <BranchCard key={branch.name} branch={branch} />)
+                ) : (
+                    <p className="text-slate-500 col-span-full text-center">
+                        Belum ada cabang yang dikonfigurasi di file .env.local
+                    </p>
+                )}
+            </div>
+        </main>
+    );
 }
 
+// getServerSideProps sekarang hanya membaca environment variable, tidak perlu fetch
 export async function getServerSideProps() {
-  const branches = JSON.parse(process.env.NEXT_PUBLIC_BRANCHES || '[]');
-  return {
-    props: { branches },
-  };
+    const branches = JSON.parse(process.env.NEXT_PUBLIC_BRANCHES || '[]');
+    return {
+        props: {
+            branches,
+        },
+    };
 }
