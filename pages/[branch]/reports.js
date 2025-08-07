@@ -1,6 +1,7 @@
 // pages/[branch]/reports.js (Refactor Desain DashCode)
 import React, { useMemo } from 'react';
 import { DollarSign, TrendingUp, Wallet, ShoppingBag, Wrench, Clock, Hash, AlertCircle } from 'lucide-react';
+import Link from 'next/link'; // <--- TAMBAHKAN BARIS INI
 
 // --- Helper Functions ---
 const formatCurrency = (number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Number(number) || 0);
@@ -158,3 +159,4 @@ export async function getServerSideProps(context) {
         };
     }
 }
+
