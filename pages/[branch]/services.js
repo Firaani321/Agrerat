@@ -144,36 +144,36 @@ export default function ServicePage({ initialServices, initialCustomers, initial
     }, [initialServices, initialCustomers, initialServiceItems]);
 
 
-    // --- PENAMBAHAN: Logika Koneksi WebSocket ---
     const API_CENTRAL_URL = process.env.NEXT_PUBLIC_API_CENTRAL_URL;
     const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
 
-    // Membuat URL WebSocket dengan parameter query
+// Menggunakan useMemo agar URL hanya dibuat ulang jika dependensi berubah
     const wsUrl = useMemo(() => {
         if (!API_CENTRAL_URL) return null;
+
+    // Membangun URL dengan URLSearchParams untuk encoding yang aman
         const url = new URL(API_CENTRAL_URL.replace(/^http/, 'ws'));
-        // Menambahkan API Key dan header zrok sebagai parameter
-        if (API_KEY) url.searchParams.set('apiKey', API_KEY);
-        url.searchParams.set('skip_zrok_interstitial', 'true');
-        return url.toString();
-    }, [API_CENTRAL_URL, API_KEY]);
     
+    // Menambahkan parameter yang dibutuhkan oleh zrok dan server kita
+        url.searchParams.set('skip_zrok_interstitial', 'true');
+        if (API_KEY) {
+            url.searchParams.set('apiKey', API_KEY);
+        }
+    
+    return url.toString();
+    }, [API_CENTRAL_URL, API_KEY]);
+
     const { readyState } = useWebSocket(wsUrl, {
         onOpen: () => console.log('[WS] Koneksi WebSocket dibuka!'),
         onClose: () => console.log('[WS] Koneksi WebSocket ditutup.'),
         onMessage: (event) => {
             const message = JSON.parse(event.data);
             console.log('[WS] Menerima pembaruan:', message);
-            
-            // Jika ada data yang diupdate dari cabang yang sedang dilihat,
-            // kita refresh data halaman dengan memicu getServerSideProps lagi.
             if (message.event === 'data_updated' && message.branch_id === activeBranch.subdomain) {
-                // router.replace digunakan untuk refresh data tanpa reload halaman penuh
-                // dan menjaga posisi scroll.
                 router.replace(router.asPath, undefined, { scroll: false });
             }
         },
-        shouldReconnect: (closeEvent) => true, // Selalu coba konek ulang jika terputus
+        shouldReconnect: (closeEvent) => true,
         reconnectInterval: 3000,
     });
 
@@ -281,5 +281,6 @@ export async function getServerSideProps(context) {
         return { props: { ...emptyProps, error: `Gagal menghubungi server pusat.`, branchName: activeBranch.name, activeBranch } };
     }
 }
+
 
 
