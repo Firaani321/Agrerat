@@ -152,7 +152,7 @@ export default function ServicePage({ initialServices, initialCustomers, initial
         if (!API_CENTRAL_URL) return null;
 
     // Membangun URL dengan URLSearchParams untuk encoding yang aman
-        const url = new URL(API_CENTRAL_URL.replace(/^http/, 'ws'));
+        const url = new URL(API_CENTRAL_URL.replace(/^http/, 'wss'));
     
     // Menambahkan parameter yang dibutuhkan oleh zrok dan server kita
         url.searchParams.set('skip_zrok_interstitial', 'true');
@@ -281,6 +281,7 @@ export async function getServerSideProps(context) {
         return { props: { ...emptyProps, error: `Gagal menghubungi server pusat.`, branchName: activeBranch.name, activeBranch } };
     }
 }
+
 
 
 
