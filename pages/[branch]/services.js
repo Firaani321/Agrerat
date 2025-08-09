@@ -146,7 +146,17 @@ export default function ServicePage({ initialServices, initialCustomers, initial
 
     // --- PENAMBAHAN: Logika Koneksi WebSocket ---
     const API_CENTRAL_URL = process.env.NEXT_PUBLIC_API_CENTRAL_URL;
-    const wsUrl = API_CENTRAL_URL ? API_CENTRAL_URL.replace(/^http/, 'ws') : null; 
+    const API_KEY = process.env.NEXT_PUBLIC_API_KEY;
+
+    // Membuat URL WebSocket dengan parameter query
+    const wsUrl = useMemo(() => {
+        if (!API_CENTRAL_URL) return null;
+        const url = new URL(API_CENTRAL_URL.replace(/^http/, 'ws'));
+        // Menambahkan API Key dan header zrok sebagai parameter
+        if (API_KEY) url.searchParams.set('apiKey', API_KEY);
+        url.searchParams.set('skip_zrok_interstitial', 'true');
+        return url.toString();
+    }, [API_CENTRAL_URL, API_KEY]);
     
     const { readyState } = useWebSocket(wsUrl, {
         onOpen: () => console.log('[WS] Koneksi WebSocket dibuka!'),
@@ -271,4 +281,5 @@ export async function getServerSideProps(context) {
         return { props: { ...emptyProps, error: `Gagal menghubungi server pusat.`, branchName: activeBranch.name, activeBranch } };
     }
 }
+
 
