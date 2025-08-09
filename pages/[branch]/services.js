@@ -2,7 +2,11 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Search, Eye, X, User, Tag, Calendar, DollarSign, ShoppingCart, Filter, Edit } from 'lucide-react';
+import { Search, Eye, X, User, Tag, Calendar, DollarSign, ShoppingCart, Filter, Edit, Wifi, WifiOff } from 'lucide-react';
+import useWebSocket, { ReadyState } from 'react-use-websocket'; // <-- Library untuk WebSocket
+import { useRouter } from 'next/router';
+
+
 
 // =======================================================
 // ===           KOMPONEN & HELPER FUNCTIONS           ===
@@ -118,31 +122,102 @@ const ServiceTable = ({ services, onViewDetails }) => {
 // ===           HALAMAN UTAMA SERVICE PAGE            ===
 // =======================================================
 export default function ServicePage({ initialServices, initialCustomers, initialServiceItems, error, branchName, activeBranch }) {
-    // =====================================================================
-    // === BAGIAN YANG DIPERBAIKI (menambahkan kembali isFilterOpen) ===
-    // =====================================================================
+    // --- State Management ---
     const [searchQuery, setSearchQuery] = useState('');
     const [filters, setFilters] = useState({ statuses: [] });
-    const [isFilterOpen, setFilterOpen] = useState(false); // State yang hilang
+    const [isFilterOpen, setFilterOpen] = useState(false);
     const [detailModalState, setDetailModalState] = useState({ isOpen: false, service: null });
-    // =====================================================================
+    
+    // --- PENAMBAHAN: State untuk data yang ditampilkan ---
+    // Diinisialisasi dengan data dari server, tapi akan diupdate oleh WebSocket
+    const [services, setServices] = useState(initialServices);
+    const [customers, setCustomers] = useState(initialCustomers);
+    const [serviceItems, setServiceItems] = useState(initialServiceItems);
+    
+    const router = useRouter();
 
+    // Efek ini memastikan jika pengguna me-refresh data (misal navigasi), state akan diperbarui
+    useEffect(() => {
+        setServices(initialServices);
+        setCustomers(initialCustomers);
+        setServiceItems(initialServiceItems);
+    }, [initialServices, initialCustomers, initialServiceItems]);
+
+
+    // --- PENAMBAHAN: Logika Koneksi WebSocket ---
+    const API_CENTRAL_URL = process.env.NEXT_PUBLIC_API_CENTRAL_URL;
+    const wsUrl = API_CENTRAL_URL ? API_CENTRAL_URL.replace(/^http/, 'ws') : null; 
+    
+    const { readyState } = useWebSocket(wsUrl, {
+        onOpen: () => console.log('[WS] Koneksi WebSocket dibuka!'),
+        onClose: () => console.log('[WS] Koneksi WebSocket ditutup.'),
+        onMessage: (event) => {
+            const message = JSON.parse(event.data);
+            console.log('[WS] Menerima pembaruan:', message);
+            
+            // Jika ada data yang diupdate dari cabang yang sedang dilihat,
+            // kita refresh data halaman dengan memicu getServerSideProps lagi.
+            if (message.event === 'data_updated' && message.branch_id === activeBranch.subdomain) {
+                // router.replace digunakan untuk refresh data tanpa reload halaman penuh
+                // dan menjaga posisi scroll.
+                router.replace(router.asPath, undefined, { scroll: false });
+            }
+        },
+        shouldReconnect: (closeEvent) => true, // Selalu coba konek ulang jika terputus
+        reconnectInterval: 3000,
+    });
+
+    const connectionStatus = {
+        [ReadyState.CONNECTING]: { text: 'Menyambung...', color: 'text-yellow-500', icon: <Wifi size={14}/> },
+        [ReadyState.OPEN]: { text: 'Real-time', color: 'text-green-500', icon: <Wifi size={14}/> },
+        [ReadyState.CLOSING]: { text: 'Menutup...', color: 'text-orange-500', icon: <WifiOff size={14}/> },
+        [ReadyState.CLOSED]: { text: 'Terputus', color: 'text-red-500', icon: <WifiOff size={14}/> },
+        [ReadyState.UNINSTANTIATED]: { text: 'Menunggu', color: 'text-gray-500', icon: <WifiOff size={14}/> },
+    }[readyState];
+    
+    
+    // --- Data Processing ---
+    // Logika useMemo sekarang menggunakan state (services, customers, dll)
+    // bukan props (initialServices, initialCustomers, dll)
     const enrichedAndFilteredServices = useMemo(() => {
-        if (error || !initialServices) return [];
-        const customerMap = new Map((initialCustomers || []).map(c => [c.local_id, c]));
+        if (error || !services) return [];
+        const customerMap = new Map((customers || []).map(c => [c.local_id, c]));
         const itemsMap = new Map();
-        (initialServiceItems || []).forEach(item => { if (!itemsMap.has(item.service_id)) itemsMap.set(item.service_id, []); itemsMap.get(item.service_id).push(item); });
-        let enriched = initialServices.map(service => ({ ...service, customer: customerMap.get(service.customer_id), items: itemsMap.get(service.local_id) || [], }));
+        (serviceItems || []).forEach(item => {
+            if (!itemsMap.has(item.service_id)) itemsMap.set(item.service_id, []);
+            itemsMap.get(item.service_id).push(item);
+        });
+        let enriched = services.map(service => ({
+            ...service,
+            customer: customerMap.get(service.customer_id),
+            items: itemsMap.get(service.local_id) || [],
+        }));
         if (filters.statuses.length > 0) enriched = enriched.filter(s => filters.statuses.includes(s.status));
-        if (searchQuery.trim() !== '') { const lowercasedQuery = searchQuery.toLowerCase(); enriched = enriched.filter(s => s.customer?.name?.toLowerCase().includes(lowercasedQuery) || s.id_service?.toLowerCase().includes(lowercasedQuery)); }
+        if (searchQuery.trim() !== '') {
+            const lowercasedQuery = searchQuery.toLowerCase();
+            enriched = enriched.filter(s =>
+                s.customer?.name?.toLowerCase().includes(lowercasedQuery) ||
+                s.id_service?.toLowerCase().includes(lowercasedQuery)
+            );
+        }
         return enriched.sort((a, b) => new Date(b.createdat) - new Date(a.createdat));
-    }, [error, initialServices, initialCustomers, initialServiceItems, searchQuery, filters]);
+    }, [error, services, customers, serviceItems, searchQuery, filters]);
 
     return (
         <main className="p-6 bg-gray-50 min-h-screen">
-            <h1 className="text-3xl font-bold mb-2">Manajemen Servis</h1>
-            <p className="text-lg text-gray-600 mb-6">Cabang: <span className="font-semibold text-blue-600">{branchName}</span></p>
+            <div className="flex justify-between items-start mb-2">
+                 <div>
+                    <h1 className="text-3xl font-bold">Manajemen Servis</h1>
+                    <p className="text-lg text-gray-600">Cabang: <span className="font-semibold text-blue-600">{branchName}</span></p>
+                </div>
+                <div className={`flex items-center gap-2 text-xs font-semibold px-3 py-1 rounded-full ${connectionStatus.color.replace('text', 'bg').replace('500', '100')}`}>
+                    {connectionStatus.icon}
+                    <span>{connectionStatus.text}</span>
+                </div>
+            </div>
+            
             <SideNavigation activeBranch={activeBranch} currentPage="services" />
+            
             <div className="flex flex-col sm:flex-row gap-4 mb-6">
                 <div className="relative flex-grow"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} /><input type="text" placeholder="Cari berdasarkan nama pelanggan atau ID servis..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full p-3 pl-10 border border-gray-300 rounded-lg"/></div>
                 <div className="relative">
@@ -150,12 +225,13 @@ export default function ServicePage({ initialServices, initialCustomers, initial
                     <ServiceFilterPopover isOpen={isFilterOpen} onClose={() => setFilterOpen(false)} onApply={setFilters} initialFilters={filters} />
                 </div>
             </div>
+            
             {error ? (<div className="text-center py-12 text-red-600 font-semibold bg-red-50 p-4 rounded-lg">{error}</div>) : (<ServiceTable services={enrichedAndFilteredServices} onViewDetails={(service) => setDetailModalState({ isOpen: true, service })} />)}
+            
             <ServiceDetailModal isOpen={detailModalState.isOpen} onClose={() => setDetailModalState({ isOpen: false, service: null })} service={detailModalState.service} />
         </main>
     );
 }
-
 // =======================================================
 // ===           PENGAMBILAN DATA SISI SERVER          ===
 // =======================================================
@@ -195,3 +271,4 @@ export async function getServerSideProps(context) {
         return { props: { ...emptyProps, error: `Gagal menghubungi server pusat.`, branchName: activeBranch.name, activeBranch } };
     }
 }
+
